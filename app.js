@@ -1,45 +1,58 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const mongoose = require("mongoose");
 
 const app = express();
-let items = ["Buy Food","Cook Food","Eat Food"];
-let workItems = [];
 
 app.use(bodyParser.urlencoded({extended:true}));
 app.use(express.static("public"));
 app.set("view engine", "ejs");
 
-app.get("/", function(req,res){
-    let today = new Date();
-    let currentDay = today.getDay();
-    let options = {
-        weekday: "long",
-        day: "numeric",
-        month: "long"
-    };
+// Connect to MongoDB
+mongoose.connect("mongodb://localhost:27017/todolistDB");
 
-    let day = today.toLocaleDateString("en-US",options);
+// Define your schema and model
+const itemsSchema = { name: String };
+const Item = mongoose.model("Item", itemsSchema);
 
-    res.render("list",{listTitle:day,newListItems:items});
+// Create new items
+const item1 = new Item({ name: "Welcome to your todolist!" });
+const item2 = new Item({ name: "Hit the + button to add a new item." });
+const item3 = new Item({ /* ... */ });
 
+app.get("/", async function(req, res) {
+    try {
+        const foundItems = await Item.find({});
+        if (foundItems.length === 0){
+            Item.insertMany([item1, item2, item3])
+        .then(() => console.log('Data inserted'))
+        .catch((error) => console.log(error));
+        res.redirect("/");
+       } else{
+           res.render("list", {listTitle: "Today", newListItems: foundItems});
+       }
+        
+    } catch (err) {
+        console.log(err);
+    }
 });
 
-app.post("/",function(req,res){
-
-    let item = req.body.newItem;
+app.post("/", async function(req,res){
+    const itemName = req.body.newItem;
+    const item = new Item({ name: itemName });
 
     if(req.body.list === "Work"){
-       workItems.push(item);
+       await item.save();
        res.redirect("/work");
-
-    }else{
-        items.push(item);
+    } else {
+        await item.save();
         res.redirect("/");
     }
 });
 
-app.get("/work",function(req,res){
-    res.render("list",{listTitle: "Work List", newListItems:workItems});
+app.get("/work", async function(req,res){
+    const workItems = await Item.find({});
+    res.render("list",{listTitle: "Work List", newListItems: workItems});
 });
 
 app.get("/about",function(req,res){
